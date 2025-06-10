@@ -1,4 +1,4 @@
-import { Tokenizer, Ast } from "./lib.js"
+import { Tokenizer, BNFParser } from "./lib.js"
 
 // Example usage:
 const src = `
@@ -17,32 +17,130 @@ const token_tree = tok.tokenize(src)
 //   console.log(token)
 // }
 
-const ast = new Ast(tok, {
-  debug: false
-});
-ast.ASSIGNMENT
-  .from.IDENTIFIER
-  .then.SYMBOL
-  .then.rec.EXPRESSION // prefetch, means that this api should be purely data-driven
-  .end
-// ast.debug = true
-// console.log(ast.ASSIGNMENT.parse([...tok.tokenize("a =")]))
-ast.BINOP
-  .from.rec.EXPRESSION
-  .then.SYMBOL.or.IDENTIFIER.is(/is|or|and/)
-  .then.rec.EXPRESSION
-  .end
-tok.debug = ast.debug = true
-console.log(ast.BINOP.parse([...tok.tokenize("a + 2")]))
-// let paren_level = []
+const bnf = new BNFParser()
+console.log(JSON.stringify([...bnf.parse`
+<program> ::= <function-definition>+
+
+<function-definition> ::=
+  <identifier> "(" <parameter-list>? ")" <compound-statement>
+
+<parameter-list> ::= <identifier> ("," <identifier>)*
+
+<compound-statement> ::= "{" <statement-list>? "}"
+
+<statement-list> ::= <statement>+
+
+<statement> ::=
+  <expression-statement>
+  | <compound-statement>
+  | <selection-statement>
+  | <iteration-statement>
+  | <jump-statement>
+
+<expression-statement> ::= <expression>? ";"
+
+<selection-statement> ::=
+  "if" "(" <expression> ")" <statement> ("else" <statement>)?
+  | "switch" "(" <expression> ")" <statement>
+
+<iteration-statement> ::=
+  "while" "(" <expression> ")" <statement>
+  | "do" <statement> "while" "(" <expression> ")" ";"
+  | "for" "(" <expression-statement> <expression-statement> <expression>? ")" <statement>
+
+<jump-statement> ::=
+  "goto" <identifier> ";"
+  | "continue" ";"
+  | "break" ";"
+  | "return" <expression>? ";"
+
+<expression> ::=
+  <assignment-expression> ("," <assignment-expression>)*
+
+<assignment-expression> ::=
+  <conditional-expression> ("=" <conditional-expression>)*
+
+<conditional-expression> ::=
+  <logical-or-expression> ("?" <expression> ":" <conditional-expression>)?
+
+<logical-or-expression> ::=
+  <logical-and-expression> ("||" <logical-and-expression>)*
+
+<logical-and-expression> ::=
+  <equality-expression> ("&&" <equality-expression>)*
+
+<equality-expression> ::=
+  <relational-expression> (("==" | "!=") <relational-expression>)*
+
+<relational-expression> ::=
+  <additive-expression> (("<" | ">" | "<=" | ">=") <additive-expression>)*
+
+<additive-expression> ::=
+  <multiplicative-expression> (("+" | "-") <multiplicative-expression>)*
+
+<multiplicative-expression> ::=
+  <unary-expression> (("*" | "/" | "%") <unary-expression>)*
+
+<unary-expression> ::=
+  ("++" | "--" | "!" | "~" | "+" | "-" | "*" | "&") <unary-expression>
+  | <postfix-expression>
+
+<postfix-expression> ::=
+  <primary-expression>
+  | <postfix-expression> "[" <expression> "]"
+  | <postfix-expression> "(" <argument-expression-list>? ")"
+  | <postfix-expression> "++"
+  | <postfix-expression> "--"
+
+<primary-expression> ::=
+  <identifier>
+  | <constant>
+  | "(" <expression> ")"
+
+<argument-expression-list> ::=
+  <assignment-expression> ("," <assignment-expression>)*
+
+<identifier> ::= [a-zA-Z_][a-zA-Z0-9_]*
+
+<constant> ::=
+  <integer-constant>
+  | <floating-constant>
+  | <character-constant>
+  | <string-literal>
+
+<integer-constant> ::= [0-9]+
+
+<floating-constant> ::= [0-9]*"."[0-9]+ | [0-9]+"."[0-9]*
+
+<character-constant> ::= "'" ([^'\\] | "\\") "'"
+
+<string-literal> ::= "\"" ([^\"\\] | "\\")* "\""`]))
+// const ast = new Ast(tok, {
+//   debug: false
+// });
+
+// // ast.debug = true
+// ast.ASSIGNMENT
+//   .from.IDENTIFIER
+//   .then.SYMBOL
+//   .then.rec.EXPRESSION
+//   .end
+// ast.BINOP
+//   .from.rec.EXPRESSION
+//   .then.SYMBOL.or.IDENTIFIER.is(/is|or|and/)
+//   .then.rec.EXPRESSION
+//   .end
+// const paren_level = []
 // ast.EXPRESSION
-//   .on_err((node) => void (node[0] && paren_level.at(-1) === node.id ? paren_level.pop() : 0))
+//   .on_err((node) => void (node[0] && paren_level.at(-1) === node ? paren_level.pop() : 0))
 //   .from.option.SYMBOL.is(/\(/)
-//   .on_some((node) => paren_level.push(node.id)) // on_some will only work if option made a match
+//   .on_some((node) => paren_level.push(node))
 //   .then.IDENTIFIER.or.NUMBER.or.rec.BINOP
-//   .if((node) => paren_level.at(-1) === node.id) // if scope is up to .push()
+//   .if((node) => paren_level.at(-1) === node)
 //   .then.SYMBOL.is(/\)/)
 //   .action(() => paren_level.pop())
+//   .end
+// console.log(ast.EXPRESSION)
 // const node_tree = ast.parse(token_tree)
 
 // function scope(type) {
